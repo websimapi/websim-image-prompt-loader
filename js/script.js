@@ -128,7 +128,8 @@ function createCanvasWrapperWithOutline(imgElement) {
   return wrapper;
 }
 
-// Apply a simple Laplacian edge detection filter to the image data, then invert for outline mode.
+// Apply a simple Laplacian edge detection filter to the image data, 
+// then threshold to produce black outlines on a white background.
 function applyEdgeDetection(imageData, width, height) {
   const src = imageData.data;
   const output = new ImageData(width, height);
@@ -143,6 +144,7 @@ function applyEdgeDetection(imageData, width, height) {
     gray[i] = 0.3 * r + 0.59 * g + 0.11 * b;
   }
 
+  const threshold = 128;
   // Apply the Laplacian kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1]
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
@@ -156,11 +158,13 @@ function applyEdgeDetection(imageData, width, height) {
       }
       sum = Math.abs(sum);
       if (sum > 255) sum = 255;
-      const inverted = 255 - sum;
+      let inverted = 255 - sum;
+      // Threshold: pixels darker than threshold become black, the rest white.
+      let finalColor = (inverted < threshold ? 0 : 255);
       const index = (y * width + x) * 4;
-      dst[index] = inverted;
-      dst[index + 1] = inverted;
-      dst[index + 2] = inverted;
+      dst[index] = finalColor;
+      dst[index + 1] = finalColor;
+      dst[index + 2] = finalColor;
       dst[index + 3] = 255;
     }
   }
@@ -169,14 +173,14 @@ function applyEdgeDetection(imageData, width, height) {
   for (let x = 0; x < width; x++) {
     let topIndex = x * 4;
     let bottomIndex = ((height - 1) * width + x) * 4;
-    dst[topIndex] = 255; dst[topIndex+1] = 255; dst[topIndex+2] = 255; dst[topIndex+3] = 255;
-    dst[bottomIndex] = 255; dst[bottomIndex+1] = 255; dst[bottomIndex+2] = 255; dst[bottomIndex+3] = 255;
+    dst[topIndex] = 255; dst[topIndex + 1] = 255; dst[topIndex + 2] = 255; dst[topIndex + 3] = 255;
+    dst[bottomIndex] = 255; dst[bottomIndex + 1] = 255; dst[bottomIndex + 2] = 255; dst[bottomIndex + 3] = 255;
   }
   for (let y = 0; y < height; y++) {
     let leftIndex = (y * width) * 4;
     let rightIndex = (y * width + (width - 1)) * 4;
-    dst[leftIndex] = 255; dst[leftIndex+1] = 255; dst[leftIndex+2] = 255; dst[leftIndex+3] = 255;
-    dst[rightIndex] = 255; dst[rightIndex+1] = 255; dst[rightIndex+2] = 255; dst[rightIndex+3] = 255;
+    dst[leftIndex] = 255; dst[leftIndex + 1] = 255; dst[leftIndex + 2] = 255; dst[leftIndex + 3] = 255;
+    dst[rightIndex] = 255; dst[rightIndex + 1] = 255; dst[rightIndex + 2] = 255; dst[rightIndex + 3] = 255;
   }
   return output;
 }
@@ -188,12 +192,19 @@ function setUpPainting(canvas) {
   let lastX = 0, lastY = 0;
 
   canvas.addEventListener('mousedown', (e) => {
-    isPainting = true;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    lastX = (e.clientX - rect.left) * scaleX;
-    lastY = (e.clientY - rect.top) * scaleY;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+    if (getSelectedTool() === "fill") {
+      floodFillAt(canvas, x, y, brushColorInput.value);
+      return;
+    } else {
+      isPainting = true;
+      lastX = x;
+      lastY = y;
+    }
   });
 
   canvas.addEventListener('mousemove', (e) => {
@@ -201,8 +212,8 @@ function setUpPainting(canvas) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    let x = (e.clientX - rect.left) * scaleX;
-    let y = (e.clientY - rect.top) * scaleY;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
     ctx.strokeStyle = brushColorInput.value;
     ctx.lineWidth = brushSizeInput.value;
     ctx.lineCap = 'round';
@@ -216,6 +227,73 @@ function setUpPainting(canvas) {
 
   canvas.addEventListener('mouseup', () => isPainting = false);
   canvas.addEventListener('mouseout', () => isPainting = false);
+}
+
+// Helper to get the currently selected painting tool.
+function getSelectedTool() {
+  const toolRadio = document.querySelector('input[name="paint-tool"]:checked');
+  return toolRadio ? toolRadio.value : "brush";
+}
+
+// Flood fill implementation for the fill bucket tool.
+function floodFillAt(canvas, startX, startY, fillColor) {
+  const ctx = canvas.getContext('2d');
+  const width = canvas.width;
+  const height = canvas.height;
+  const imageData = ctx.getImageData(0, 0, width, height);
+  const data = imageData.data;
+  const x = Math.floor(startX);
+  const y = Math.floor(startY);
+  const targetIndex = (y * width + x) * 4;
+  const targetColor = [
+    data[targetIndex],
+    data[targetIndex + 1],
+    data[targetIndex + 2],
+    data[targetIndex + 3]
+  ];
+  const fillColorArray = fillColorToArray(fillColor);
+  if (matchColor(targetColor, fillColorArray)) return;
+  const stack = [];
+  stack.push([x, y]);
+  while (stack.length) {
+    const [cx, cy] = stack.pop();
+    const idx = (cy * width + cx) * 4;
+    const currentColor = [
+      data[idx],
+      data[idx + 1],
+      data[idx + 2],
+      data[idx + 3]
+    ];
+    if (!matchColor(currentColor, targetColor)) continue;
+    data[idx] = fillColorArray[0];
+    data[idx + 1] = fillColorArray[1];
+    data[idx + 2] = fillColorArray[2];
+    data[idx + 3] = fillColorArray[3];
+    if (cx > 0) stack.push([cx - 1, cy]);
+    if (cx < width - 1) stack.push([cx + 1, cy]);
+    if (cy > 0) stack.push([cx, cy - 1]);
+    if (cy < height - 1) stack.push([cx, cy + 1]);
+  }
+  ctx.putImageData(imageData, 0, 0);
+}
+
+// Convert a hex color string to an RGBA array.
+function fillColorToArray(hex) {
+  if (hex[0] === '#') hex = hex.slice(1);
+  const r = parseInt(hex.substr(0, 2), 16);
+  const g = parseInt(hex.substr(2, 2), 16);
+  const b = parseInt(hex.substr(4, 2), 16);
+  return [r, g, b, 255];
+}
+
+// Compare two RGBA color arrays.
+function matchColor(color1, color2) {
+  return (
+    color1[0] === color2[0] &&
+    color1[1] === color2[1] &&
+    color1[2] === color2[2] &&
+    color1[3] === color2[3]
+  );
 }
 
 // Clear the overlay canvas when the user clicks "Clear Painting".

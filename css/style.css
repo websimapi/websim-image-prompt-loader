@@ -1,7 +1,7 @@
 /* Base Styles */
 body {
   font-family: sans-serif;
-  background: #ffe6e6; 
+  background: #ffe6e6;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -26,7 +26,7 @@ body {
   width: 90%;
   background: #fff;
   padding: 2rem;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
 }
 
@@ -73,11 +73,11 @@ button#load-image-btn:hover {
 
 /* Card Styles */
 .card {
-  display: none; 
+  display: none;
   border: 2px solid #ff69b4;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 0 5px rgba(0,0,0,0.2);
+  box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
   margin-top: 1rem;
 }
 .card-image-container {
@@ -153,9 +153,22 @@ button#load-image-btn:hover {
 #control-panel label {
   margin-right: 1rem;
 }
-#paint-panel {
-  margin-top: 0.5rem;
+
+/* Paint Tool Panel Styling */
+#paint-tool-options {
+  margin-bottom: 0.5rem;
+  text-align: center;
 }
-#paint-panel label {
-  margin-right: 0.5rem;
+#paint-tool-options label {
+  margin-right: 1rem;
+}
+#paint-settings {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+#paint-settings label {
+  margin-right: 0.25rem;
 }

@@ -1,66 +1,79 @@
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Valentine's Day Card Generator</title>
-  <link rel="stylesheet" href="css/style.css" />
-</head>
-<body>
-  <!-- Background Decorative SVG Pattern -->
-  <div class="background-decor">
-    <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 100 100">
-      <defs>
-        <pattern id="hearts" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
-          <path d="M10 3
-                   C6 0, 0 0, 0 5
-                   C0 9, 10 17, 10 17
-                   C10 17, 20 9, 20 5
-                   C20 0, 14 0, 10 3
-                   Z" fill="rgba(255,0,0,0.3)" />
-        </pattern>
-      </defs>
-      <rect width="100" height="100" fill="url(#hearts)" />
-    </svg>
-  </div>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Valentine's Day Card Generator</title>
+    <link rel="stylesheet" href="css/style.css" />
+  </head>
+  <body>
+    <!-- Background Decorative SVG Pattern -->
+    <div class="background-decor">
+      <svg width="100%" height="100%" preserveAspectRatio="none" viewBox="0 0 100 100">
+        <defs>
+          <pattern id="hearts" x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+            <path
+              d="M10 3
+                 C6 0, 0 0, 0 5
+                 C0 9, 10 17, 10 17
+                 C10 17, 20 9, 20 5
+                 C20 0, 14 0, 10 3
+                 Z"
+              fill="rgba(255,0,0,0.3)"
+            />
+          </pattern>
+        </defs>
+        <rect width="100" height="100" fill="url(#hearts)" />
+      </svg>
+    </div>
 
-  <div class="container">
-    <h1>Valentine's Day Card Generator</h1>
-    <div class="prompt-form">
-      <input type="text" id="image-prompt" placeholder="Enter image URL or prompt" />
-      <button id="load-image-btn">Generate Card</button>
-    </div>
-    <div id="status"></div>
-    <!-- Control Panel for Outline Mode & Painting -->
-    <div id="control-panel">
-      <label><input type="checkbox" id="outline-mode"> Outline Mode</label>
-      <div id="paint-panel" style="display: none;">
-        <label for="brush-color">Brush Color:</label>
-        <input type="color" id="brush-color" value="#ff1493">
-        <label for="brush-size">Brush Size:</label>
-        <input type="range" id="brush-size" min="1" max="50" value="5">
-        <button id="clear-paint-btn">Clear Painting</button>
+    <div class="container">
+      <h1>Valentine's Day Card Generator</h1>
+      <div class="prompt-form">
+        <input type="text" id="image-prompt" placeholder="Enter image URL or prompt" />
+        <button id="load-image-btn">Generate Card</button>
+      </div>
+      <div id="status"></div>
+      <!-- Control Panel for Outline Mode & Painting -->
+      <div id="control-panel">
+        <label><input type="checkbox" id="outline-mode" /> Outline Mode</label>
+        <div id="paint-panel" style="display: none;">
+          <div id="paint-tool-options">
+            <label>
+              <input type="radio" name="paint-tool" value="brush" checked /> Brush
+            </label>
+            <label>
+              <input type="radio" name="paint-tool" value="fill" /> Fill Bucket
+            </label>
+          </div>
+          <div id="paint-settings">
+            <label for="brush-color">Color:</label>
+            <input type="color" id="brush-color" value="#ff1493" />
+            <label for="brush-size" class="brush-size-label">Brush Size:</label>
+            <input type="range" id="brush-size" min="1" max="50" value="5" />
+            <button id="clear-paint-btn">Clear Painting</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card Preview -->
+      <div id="card" class="card">
+        <div id="card-image-container" class="card-image-container">
+          <!-- The image or canvas will be dynamically inserted here -->
+        </div>
+        <div class="card-text">
+          <label for="card-for">For:</label>
+          <input type="text" id="card-for" placeholder="Recipient's name" />
+
+          <label for="card-from">From:</label>
+          <input type="text" id="card-from" placeholder="Your name" />
+
+          <label for="card-message">Message:</label>
+          <textarea id="card-message" placeholder="Your heartfelt message"></textarea>
+        </div>
+        <button id="print-btn">Print Card</button>
       </div>
     </div>
-    
-    <!-- Card Preview -->
-    <div id="card" class="card">
-      <div id="card-image-container" class="card-image-container">
-        <!-- The image or canvas will be dynamically inserted here -->
-      </div>
-      <div class="card-text">
-        <label for="card-for">For:</label>
-        <input type="text" id="card-for" placeholder="Recipient's name" />
-        
-        <label for="card-from">From:</label>
-        <input type="text" id="card-from" placeholder="Your name" />
-        
-        <label for="card-message">Message:</label>
-        <textarea id="card-message" placeholder="Your heartfelt message"></textarea>
-      </div>
-      <button id="print-btn">Print Card</button>
-    </div>
-  </div>
-  <script type="module" src="js/script.js"></script>
-<script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
+    <script type="module" src="js/script.js"></script>
+  <script defer src="https://static.cloudflareinsights.com/beacon.min.js/v8c78df7c7c0f484497ecbca7046644da1771523124516" integrity="sha512-8DS7rgIrAmghBFwoOTujcf6D9rXvH8xm8JQ1Ja01h9QX8EzXldiszufYa4IFfKdLUKTTrnSFXLDkUEOTrZQ8Qg==" data-cf-beacon='{"version":"2024.11.0","token":"4c6229722a6346bc8eb5cb0e5eae5d41","server_timing":{"name":{"cfCacheStatus":true,"cfEdge":true,"cfExtPri":true,"cfL4":true,"cfOrigin":true,"cfSpeedBrain":true},"location_startswith":null}}' crossorigin="anonymous"></script>
 </body>
 </html>
