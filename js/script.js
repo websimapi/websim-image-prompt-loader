@@ -45,6 +45,8 @@ loadImageBtn.addEventListener('click', () => {
   // Create an image element with the prompt text as src and alt.
   const imgElement = document.createElement('img');
   imgElement.id = uniqueId;
+  // Set crossOrigin to 'anonymous' to avoid canvas tainting when processing the image.
+  imgElement.crossOrigin = 'anonymous';
   imgElement.src = promptText;
   imgElement.alt = promptText;
   // If Outline Mode is selected, hide the raw image (we'll process it into a canvas).
