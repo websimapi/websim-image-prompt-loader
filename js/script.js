@@ -87,9 +87,6 @@ function createCanvasWrapperWithOutline(imgElement) {
   const outlineCanvas = document.createElement('canvas');
   outlineCanvas.width = width;
   outlineCanvas.height = height;
-  outlineCanvas.style.position = 'absolute';
-  outlineCanvas.style.top = '0';
-  outlineCanvas.style.left = '0';
   const outlineCtx = outlineCanvas.getContext('2d');
   outlineCtx.drawImage(imgElement, 0, 0, width, height);
   let imageData = outlineCtx.getImageData(0, 0, width, height);
@@ -100,18 +97,29 @@ function createCanvasWrapperWithOutline(imgElement) {
   const overlayCanvas = document.createElement('canvas');
   overlayCanvas.width = width;
   overlayCanvas.height = height;
-  overlayCanvas.style.position = 'absolute';
-  overlayCanvas.style.top = '0';
-  overlayCanvas.style.left = '0';
 
   // Store the overlay canvas globally to allow clearing.
   currentOverlayCanvas = overlayCanvas;
 
-  // Create a wrapper div to stack the canvases.
+  // Create a wrapper div with aspect ratio preserved.
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
-  wrapper.style.width = width + 'px';
-  wrapper.style.height = height + 'px';
+  wrapper.style.width = '100%';
+  wrapper.style.paddingTop = (height / width * 100) + '%';
+
+  // Set canvases to fill the wrapper.
+  outlineCanvas.style.position = 'absolute';
+  outlineCanvas.style.top = '0';
+  outlineCanvas.style.left = '0';
+  outlineCanvas.style.width = '100%';
+  outlineCanvas.style.height = '100%';
+
+  overlayCanvas.style.position = 'absolute';
+  overlayCanvas.style.top = '0';
+  overlayCanvas.style.left = '0';
+  overlayCanvas.style.width = '100%';
+  overlayCanvas.style.height = '100%';
+
   wrapper.appendChild(outlineCanvas);
   wrapper.appendChild(overlayCanvas);
 
@@ -120,7 +128,7 @@ function createCanvasWrapperWithOutline(imgElement) {
   return wrapper;
 }
 
-// Apply a simple Laplacian edge detection filter to the image data.
+// Apply a simple Laplacian edge detection filter to the image data, then invert for outline mode.
 function applyEdgeDetection(imageData, width, height) {
   const src = imageData.data;
   const output = new ImageData(width, height);
@@ -148,10 +156,11 @@ function applyEdgeDetection(imageData, width, height) {
       }
       sum = Math.abs(sum);
       if (sum > 255) sum = 255;
+      const inverted = 255 - sum;
       const index = (y * width + x) * 4;
-      dst[index] = sum;
-      dst[index + 1] = sum;
-      dst[index + 2] = sum;
+      dst[index] = inverted;
+      dst[index + 1] = inverted;
+      dst[index + 2] = inverted;
       dst[index + 3] = 255;
     }
   }
@@ -172,7 +181,7 @@ function applyEdgeDetection(imageData, width, height) {
   return output;
 }
 
-// Set up painting functionality on the overlay canvas.
+// Set up painting functionality on the overlay canvas with proper scaling.
 function setUpPainting(canvas) {
   const ctx = canvas.getContext('2d');
   let isPainting = false;
@@ -181,15 +190,19 @@ function setUpPainting(canvas) {
   canvas.addEventListener('mousedown', (e) => {
     isPainting = true;
     const rect = canvas.getBoundingClientRect();
-    lastX = e.clientX - rect.left;
-    lastY = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    lastX = (e.clientX - rect.left) * scaleX;
+    lastY = (e.clientY - rect.top) * scaleY;
   });
 
   canvas.addEventListener('mousemove', (e) => {
     if (!isPainting) return;
     const rect = canvas.getBoundingClientRect();
-    let x = e.clientX - rect.left;
-    let y = e.clientY - rect.top;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    let x = (e.clientX - rect.left) * scaleX;
+    let y = (e.clientY - rect.top) * scaleY;
     ctx.strokeStyle = brushColorInput.value;
     ctx.lineWidth = brushSizeInput.value;
     ctx.lineCap = 'round';
