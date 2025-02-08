@@ -43,11 +43,13 @@ edgeThresholdInput.addEventListener('input', () => {
 });
 
 loadImageBtn.addEventListener('click', () => {
-  const promptText = imagePromptInput.value.trim();
-  if (!promptText) {
+  const userPrompt = imagePromptInput.value.trim();
+  if (!userPrompt) {
     statusDiv.textContent = "Please enter an image prompt!";
     return;
   }
+  // Prepend and append the required phrases.
+  const promptText = "Valentines Day " + userPrompt + " Everything Outline";
 
   // Clear previous image/canvas and hide card preview.
   cardImageContainer.innerHTML = '';
@@ -65,7 +67,7 @@ loadImageBtn.addEventListener('click', () => {
   imgElement.alt = promptText;
   
   if (outlineModeCheckbox.checked) {
-    // In outline mode, we'll process the image using canvas.
+    // In outline mode, hide the raw image while we process it.
     imgElement.style.display = 'none';
   }
   
@@ -77,7 +79,7 @@ loadImageBtn.addEventListener('click', () => {
       clearInterval(checkInterval);
       statusDiv.textContent = "Image loaded successfully!";
       if (outlineModeCheckbox.checked) {
-        // Process the loaded image to create an outline version with painting on a single canvas.
+        // Process the loaded image to create an outline version and enable painting.
         cardImageContainer.innerHTML = '';
         currentImageElement = imgElement; // store for future updates
         const wrapper = createCanvasWrapperWithOutline(imgElement);
@@ -113,7 +115,15 @@ function createCanvasWrapperWithOutline(imgElement) {
   // Draw the original image onto the canvas.
   ctx.drawImage(imgElement, 0, 0, width, height);
   let imageData = ctx.getImageData(0, 0, width, height);
-  let processedData = applyEdgeDetection(imageData, width, height, edgeThreshold);
+
+  // Auto-detect optimal edge threshold based on image data.
+  const optimalThreshold = computeOptimalEdgeThreshold(imageData, width, height);
+  // Update slider UI.
+  edgeThresholdInput.value = optimalThreshold;
+  edgeThresholdValueSpan.textContent = optimalThreshold;
+  edgeThreshold = optimalThreshold;
+
+  let processedData = applyEdgeDetection(imageData, width, height, optimalThreshold);
   ctx.putImageData(processedData, 0, 0);
   
   // Store baseline outlined image data for clearing painting.
@@ -201,6 +211,36 @@ function applyEdgeDetection(imageData, width, height, threshold) {
     dst[rightIndex] = 255; dst[rightIndex + 1] = 255; dst[rightIndex + 2] = 255; dst[rightIndex + 3] = 255;
   }
   return output;
+}
+
+// Compute an optimal edge threshold by sampling the image's inverted edge values.
+function computeOptimalEdgeThreshold(imageData, width, height) {
+  const data = imageData.data;
+  let sumInverted = 0;
+  let count = 0;
+  // Sample every 2nd pixel for performance.
+  for (let y = 1; y < height - 1; y += 2) {
+    for (let x = 1; x < width - 1; x += 2) {
+      let pixelSum = 0;
+      for (let ky = -1; ky <= 1; ky++) {
+        for (let kx = -1; kx <= 1; kx++) {
+          const idx = ((y + ky) * width + (x + kx));
+          const r = data[idx * 4];
+          const g = data[idx * 4 + 1];
+          const b = data[idx * 4 + 2];
+          const grayVal = 0.3 * r + 0.59 * g + 0.11 * b;
+          const weight = (kx === 0 && ky === 0) ? 8 : -1;
+          pixelSum += weight * grayVal;
+        }
+      }
+      pixelSum = Math.abs(pixelSum);
+      if (pixelSum > 255) pixelSum = 255;
+      const inverted = 255 - pixelSum;
+      sumInverted += inverted;
+      count++;
+    }
+  }
+  return count ? Math.floor(sumInverted / count) : 128;
 }
 
 // Set up painting functionality on the provided canvas.
@@ -327,7 +367,7 @@ clearPaintBtn.addEventListener('click', () => {
   if (outlineModeCheckbox.checked && currentOutlineCanvas && currentBaselineImageData) {
     const ctx = currentOutlineCanvas.getContext('2d');
     ctx.putImageData(currentBaselineImageData, 0, 0);
-  } else if (currentOutlineCanvas) { // fallback, though normally non-outline mode doesn't have painting
+  } else if (currentOutlineCanvas) {
     const ctx = currentOutlineCanvas.getContext('2d');
     ctx.clearRect(0, 0, currentOutlineCanvas.width, currentOutlineCanvas.height);
   }
