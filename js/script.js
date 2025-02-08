@@ -1,5 +1,8 @@
-// Unique image counter to help generate unique IDs.
+// Global variables
 let imageCounter = 0;
+let currentOutlineCanvas = null;  // For outline mode single canvas
+let currentBaselineImageData = null; // Stores baseline outlined image data
+let currentImageElement = null; // To reprocess outline when threshold changes
 
 const loadImageBtn = document.getElementById('load-image-btn');
 const imagePromptInput = document.getElementById('image-prompt');
@@ -8,22 +11,34 @@ const statusDiv = document.getElementById('status');
 const cardDiv = document.getElementById('card');
 const printBtn = document.getElementById('print-btn');
 
-// New DOM elements for outline mode and painting features.
 const outlineModeCheckbox = document.getElementById('outline-mode');
 const paintPanel = document.getElementById('paint-panel');
 const brushColorInput = document.getElementById('brush-color');
 const brushSizeInput = document.getElementById('brush-size');
 const clearPaintBtn = document.getElementById('clear-paint-btn');
 
-// Global variable to store the current overlay canvas for painting.
-let currentOverlayCanvas = null;
+const edgeThresholdInput = document.getElementById('edge-threshold');
+const edgeThresholdValueSpan = document.getElementById('edge-threshold-value');
+const edgeThresholdControl = document.getElementById('edge-threshold-control');
 
-// Toggle the display of the paint panel based on the Outline Mode checkbox.
+let edgeThreshold = parseInt(edgeThresholdInput.value, 10);
+
+// Toggle display of paint panel and edge threshold control based on Outline Mode checkbox.
 outlineModeCheckbox.addEventListener('change', () => {
   if (outlineModeCheckbox.checked) {
     paintPanel.style.display = 'block';
+    edgeThresholdControl.style.display = 'block';
   } else {
     paintPanel.style.display = 'none';
+    edgeThresholdControl.style.display = 'none';
+  }
+});
+
+edgeThresholdInput.addEventListener('input', () => {
+  edgeThreshold = parseInt(edgeThresholdInput.value, 10);
+  edgeThresholdValueSpan.textContent = edgeThreshold;
+  if (outlineModeCheckbox.checked && currentOutlineCanvas && currentImageElement) {
+    updateOutlineCanvas();
   }
 });
 
@@ -42,30 +57,31 @@ loadImageBtn.addEventListener('click', () => {
   imageCounter++;
   const uniqueId = `img-${Date.now()}-${imageCounter}`;
 
-  // Create an image element with the prompt text as src and alt.
+  // Create an image element.
   const imgElement = document.createElement('img');
   imgElement.id = uniqueId;
-  // Set crossOrigin to 'anonymous' to avoid canvas tainting when processing the image.
   imgElement.crossOrigin = 'anonymous';
   imgElement.src = promptText;
   imgElement.alt = promptText;
-  // If Outline Mode is selected, hide the raw image (we'll process it into a canvas).
+  
   if (outlineModeCheckbox.checked) {
+    // In outline mode, we'll process the image using canvas.
     imgElement.style.display = 'none';
   }
+  
   cardImageContainer.appendChild(imgElement);
 
   const originalSrc = promptText;
   const checkInterval = setInterval(() => {
-    // Check if the image has loaded by using its complete property and naturalWidth.
     if (imgElement.complete && imgElement.naturalWidth !== 0) {
       clearInterval(checkInterval);
       statusDiv.textContent = "Image loaded successfully!";
       if (outlineModeCheckbox.checked) {
-        // Process the loaded image to create an outline version with a painting overlay.
+        // Process the loaded image to create an outline version with painting on a single canvas.
         cardImageContainer.innerHTML = '';
-        const canvasWrapper = createCanvasWrapperWithOutline(imgElement);
-        cardImageContainer.appendChild(canvasWrapper);
+        currentImageElement = imgElement; // store for future updates
+        const wrapper = createCanvasWrapperWithOutline(imgElement);
+        cardImageContainer.appendChild(wrapper);
       } else {
         imgElement.classList.add('loaded');
       }
@@ -78,65 +94,68 @@ printBtn.addEventListener('click', () => {
   window.print();
 });
 
-// Create a canvas wrapper that contains the outline processed canvas and an overlay canvas for painting.
+// Create a canvas wrapper with outlined image and painting functionality.
 function createCanvasWrapperWithOutline(imgElement) {
   const width = imgElement.naturalWidth;
   const height = imgElement.naturalHeight;
-
-  // Create the canvas for the outline effect.
-  const outlineCanvas = document.createElement('canvas');
-  outlineCanvas.width = width;
-  outlineCanvas.height = height;
-  const outlineCtx = outlineCanvas.getContext('2d');
-  outlineCtx.drawImage(imgElement, 0, 0, width, height);
-  let imageData = outlineCtx.getImageData(0, 0, width, height);
-  let processedData = applyEdgeDetection(imageData, width, height);
-  outlineCtx.putImageData(processedData, 0, 0);
-
-  // Create the overlay canvas for painting.
-  const overlayCanvas = document.createElement('canvas');
-  overlayCanvas.width = width;
-  overlayCanvas.height = height;
-
-  // Store the overlay canvas globally to allow clearing.
-  currentOverlayCanvas = overlayCanvas;
-
-  // Create a wrapper div with aspect ratio preserved.
+  
+  // Create a single canvas.
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.style.position = 'absolute';
+  canvas.style.top = '0';
+  canvas.style.left = '0';
+  canvas.style.width = '100%';
+  canvas.style.height = '100%';
+  
+  const ctx = canvas.getContext('2d');
+  // Draw the original image onto the canvas.
+  ctx.drawImage(imgElement, 0, 0, width, height);
+  let imageData = ctx.getImageData(0, 0, width, height);
+  let processedData = applyEdgeDetection(imageData, width, height, edgeThreshold);
+  ctx.putImageData(processedData, 0, 0);
+  
+  // Store baseline outlined image data for clearing painting.
+  currentBaselineImageData = ctx.getImageData(0, 0, width, height);
+  
+  // Create a wrapper div to maintain aspect ratio.
   const wrapper = document.createElement('div');
   wrapper.style.position = 'relative';
   wrapper.style.width = '100%';
   wrapper.style.paddingTop = (height / width * 100) + '%';
-
-  // Set canvases to fill the wrapper.
-  outlineCanvas.style.position = 'absolute';
-  outlineCanvas.style.top = '0';
-  outlineCanvas.style.left = '0';
-  outlineCanvas.style.width = '100%';
-  outlineCanvas.style.height = '100%';
-
-  overlayCanvas.style.position = 'absolute';
-  overlayCanvas.style.top = '0';
-  overlayCanvas.style.left = '0';
-  overlayCanvas.style.width = '100%';
-  overlayCanvas.style.height = '100%';
-
-  wrapper.appendChild(outlineCanvas);
-  wrapper.appendChild(overlayCanvas);
-
-  // Set up painting on the overlay canvas.
-  setUpPainting(overlayCanvas);
+  wrapper.appendChild(canvas);
+  
+  // Set up painting on this canvas.
+  setUpPainting(canvas);
+  currentOutlineCanvas = canvas;
   return wrapper;
 }
 
-// Apply a simple Laplacian edge detection filter to the image data, 
-// then threshold to produce black outlines on a white background.
-function applyEdgeDetection(imageData, width, height) {
+// Update the outline canvas when edge threshold changes.
+function updateOutlineCanvas() {
+  const canvas = currentOutlineCanvas;
+  const width = canvas.width;
+  const height = canvas.height;
+  const ctx = canvas.getContext('2d');
+  // Redraw the original image and apply edge detection.
+  ctx.drawImage(currentImageElement, 0, 0, width, height);
+  let imageData = ctx.getImageData(0, 0, width, height);
+  let processedData = applyEdgeDetection(imageData, width, height, edgeThreshold);
+  ctx.putImageData(processedData, 0, 0);
+  // Update the baseline image data.
+  currentBaselineImageData = ctx.getImageData(0, 0, width, height);
+}
+
+// Enhanced edge detection using Laplacian kernel and adjustable threshold.
+// Produces black outlines on a white background.
+function applyEdgeDetection(imageData, width, height, threshold) {
   const src = imageData.data;
   const output = new ImageData(width, height);
   const dst = output.data;
   const gray = new Uint8ClampedArray(width * height);
 
-  // Convert the image to grayscale.
+  // Convert image to grayscale.
   for (let i = 0; i < width * height; i++) {
     const r = src[i * 4];
     const g = src[i * 4 + 1];
@@ -144,8 +163,7 @@ function applyEdgeDetection(imageData, width, height) {
     gray[i] = 0.3 * r + 0.59 * g + 0.11 * b;
   }
 
-  const threshold = 128;
-  // Apply the Laplacian kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1]
+  // Apply Laplacian kernel: [-1, -1, -1, -1, 8, -1, -1, -1, -1]
   for (let y = 1; y < height - 1; y++) {
     for (let x = 1; x < width - 1; x++) {
       let sum = 0;
@@ -159,7 +177,7 @@ function applyEdgeDetection(imageData, width, height) {
       sum = Math.abs(sum);
       if (sum > 255) sum = 255;
       let inverted = 255 - sum;
-      // Threshold: pixels darker than threshold become black, the rest white.
+      // Use adjustable threshold: pixels with inverted value below threshold become black, else white.
       let finalColor = (inverted < threshold ? 0 : 255);
       const index = (y * width + x) * 4;
       dst[index] = finalColor;
@@ -185,7 +203,7 @@ function applyEdgeDetection(imageData, width, height) {
   return output;
 }
 
-// Set up painting functionality on the overlay canvas with proper scaling.
+// Set up painting functionality on the provided canvas.
 function setUpPainting(canvas) {
   const ctx = canvas.getContext('2d');
   let isPainting = false;
@@ -235,12 +253,18 @@ function getSelectedTool() {
   return toolRadio ? toolRadio.value : "brush";
 }
 
-// Flood fill implementation for the fill bucket tool.
+// Flood fill implementation on the canvas for the fill bucket tool.
 function floodFillAt(canvas, startX, startY, fillColor) {
   const ctx = canvas.getContext('2d');
   const width = canvas.width;
   const height = canvas.height;
-  const imageData = ctx.getImageData(0, 0, width, height);
+  let imageData;
+  try {
+    imageData = ctx.getImageData(0, 0, width, height);
+  } catch (e) {
+    console.error("Unable to access image data for flood fill:", e);
+    return;
+  }
   const data = imageData.data;
   const x = Math.floor(startX);
   const y = Math.floor(startY);
@@ -252,7 +276,9 @@ function floodFillAt(canvas, startX, startY, fillColor) {
     data[targetIndex + 3]
   ];
   const fillColorArray = fillColorToArray(fillColor);
-  if (matchColor(targetColor, fillColorArray)) return;
+  if (matchColor(targetColor, fillColorArray, 0)) return;
+  
+  const fillTolerance = 32;
   const stack = [];
   stack.push([x, y]);
   while (stack.length) {
@@ -264,7 +290,7 @@ function floodFillAt(canvas, startX, startY, fillColor) {
       data[idx + 2],
       data[idx + 3]
     ];
-    if (!matchColor(currentColor, targetColor)) continue;
+    if (!matchColor(currentColor, targetColor, fillTolerance)) continue;
     data[idx] = fillColorArray[0];
     data[idx + 1] = fillColorArray[1];
     data[idx + 2] = fillColorArray[2];
@@ -286,20 +312,23 @@ function fillColorToArray(hex) {
   return [r, g, b, 255];
 }
 
-// Compare two RGBA color arrays.
-function matchColor(color1, color2) {
+// Compare two RGBA color arrays with an optional tolerance.
+function matchColor(color1, color2, tolerance = 0) {
   return (
-    color1[0] === color2[0] &&
-    color1[1] === color2[1] &&
-    color1[2] === color2[2] &&
-    color1[3] === color2[3]
+    Math.abs(color1[0] - color2[0]) <= tolerance &&
+    Math.abs(color1[1] - color2[1]) <= tolerance &&
+    Math.abs(color1[2] - color2[2]) <= tolerance &&
+    Math.abs(color1[3] - color2[3]) <= tolerance
   );
 }
 
-// Clear the overlay canvas when the user clicks "Clear Painting".
+// Clear the painting. In outline mode, restore the baseline outlined image.
 clearPaintBtn.addEventListener('click', () => {
-  if (currentOverlayCanvas) {
-    const ctx = currentOverlayCanvas.getContext('2d');
-    ctx.clearRect(0, 0, currentOverlayCanvas.width, currentOverlayCanvas.height);
+  if (outlineModeCheckbox.checked && currentOutlineCanvas && currentBaselineImageData) {
+    const ctx = currentOutlineCanvas.getContext('2d');
+    ctx.putImageData(currentBaselineImageData, 0, 0);
+  } else if (currentOutlineCanvas) { // fallback, though normally non-outline mode doesn't have painting
+    const ctx = currentOutlineCanvas.getContext('2d');
+    ctx.clearRect(0, 0, currentOutlineCanvas.width, currentOutlineCanvas.height);
   }
 });

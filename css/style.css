@@ -83,7 +83,8 @@ button#load-image-btn:hover {
 .card-image-container {
   position: relative;
 }
-.card-image-container img {
+.card-image-container img,
+.card-image-container canvas {
   width: 100%;
   display: block;
   border-bottom: 2px solid #ff69b4;
@@ -171,4 +172,10 @@ button#load-image-btn:hover {
 }
 #paint-settings label {
   margin-right: 0.25rem;
+}
+
+/* Edge Threshold Control Styling */
+#edge-threshold-control {
+  margin-top: 0.5rem;
+  text-align: center;
 }

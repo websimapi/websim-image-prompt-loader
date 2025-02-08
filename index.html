@@ -33,9 +33,16 @@
         <button id="load-image-btn">Generate Card</button>
       </div>
       <div id="status"></div>
+      
       <!-- Control Panel for Outline Mode & Painting -->
       <div id="control-panel">
         <label><input type="checkbox" id="outline-mode" /> Outline Mode</label>
+        <!-- Edge Threshold Control: visible only in Outline Mode -->
+        <div id="edge-threshold-control" style="display: none; text-align: center; margin-top: 0.5rem;">
+          <label for="edge-threshold">Edge Threshold:</label>
+          <input type="range" id="edge-threshold" min="50" max="200" value="128" />
+          <span id="edge-threshold-value">128</span>
+        </div>
         <div id="paint-panel" style="display: none;">
           <div id="paint-tool-options">
             <label>
